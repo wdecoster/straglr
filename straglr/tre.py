@@ -16,16 +16,17 @@ from pybedtools import BedTool
 from datetime import datetime
 
 class TREFinder:
-    def __init__(self, bam, genome_fasta, reads_fasta=None, check_split_alignments=True,
+    def __init__(self, bam, genome_fasta, sex="female", reads_fasta=None, check_split_alignments=True,
                  max_str_len=50, min_str_len=2, flank_size=100, min_support=2, nprocs=1,
                  max_num_clusters=3, min_cluster_size=2,
                  genotype_in_size=False, trf_args='2 5 5 80 10 10 500 -d -h', debug=False):
         self.bam = bam
         self.genome_fasta = genome_fasta
+        self.sex = sex
         trf_path = spawn.find_executable("trf")
         if not trf_path:
             sys.exit('ABORT: {}'.format("can't find trf in PATH"))
-            
+
         self.trf_args = trf_args
         self.flank_len = 2000
 
@@ -64,13 +65,13 @@ class TREFinder:
         m = re.search('(\d[\d\s]*\d)', self.trf_args)
         if m is not None:
             return '{}/{}.{}.dat'.format(os.getcwd(), os.path.basename(input_fasta), m.group(1).replace(' ', '.'))
-    
+
     def run_trf(self, input_fasta):
         cmd = ' '.join(['trf', input_fasta, self.trf_args])
         # redirect stdout and stderr to devnull
         FNULL = open(os.devnull, 'w')
         returncode = subprocess.call(cmd, shell=True, stdout=FNULL, stderr=FNULL)
-        
+
         output = self.construct_trf_output(input_fasta)
         if os.path.exists(output):
             return output
@@ -79,7 +80,7 @@ class TREFinder:
 
     def type_trf_cols(self, cols):
         return list(map(int, cols[:3])) + [float(cols[3])] + list(map(int, cols[4:12])) + [float(cols[12])] + cols[13:]
-    
+
     def parse_trf(self, trf_output):
         """
             columns:
@@ -137,7 +138,7 @@ class TREFinder:
 
     def extract_genome_neighbour(self, chrom, tpos, w, genome_fasta):
         return genome_fasta.fetch(chrom, max(0, tpos - w), tpos + w)
-    
+
     def analyze_trf(self, results, target_flank, full_cov=0.7):
         same_pats = self.find_similar_long_patterns_ins(results)
 
@@ -151,7 +152,7 @@ class TREFinder:
                     expansions[eid] = pat, pgstart, pgend
 
         return expansions
-    
+
     def find_similar_long_patterns_ins(self, results, min_len=4):
         queries = set()
         targets = set()
@@ -168,8 +169,8 @@ class TREFinder:
         if queries and targets:
             blastn_out = self.align_patterns(queries, targets)
             if blastn_out and os.path.exists(blastn_out):
-                same_pats = self.parse_pat_blastn(blastn_out) 
-        
+                same_pats = self.parse_pat_blastn(blastn_out)
+
         return same_pats
 
     def is_same_repeat(self, reps, same_pats=None, min_fraction=0.5):
@@ -230,7 +231,7 @@ class TREFinder:
 
         merged_list = merge_spans(coords)
         gap_list = complement_spans(merged_list)
- 
+
         gaps_filled = []
         for i in range(len(merged_list)-1):
             if gap_list[i]:
@@ -290,7 +291,7 @@ class TREFinder:
                                rep_len = rep_lens[i]
                                if r[13] != i_pat:
                                     pattern_matched += ',{}'.format(r[13])
-            
+
                     if pgstart is None:
                         for i in range(len(filtered_results['t'])):
                             r = filtered_results['t'][i]
@@ -343,7 +344,7 @@ class TREFinder:
         tres_merged = tres_bed.sort().merge(d=d, c='4,2', o='distinct,count')
         if self.debug:
             tres_merged.saveas('tres_loci.bed')
-    
+
         merged = []
         for tre in tres_merged:
             repeats = sorted(tre[3].split(','), key=len)
@@ -464,7 +465,7 @@ class TREFinder:
                     for locus in queries.keys():
                         if query in queries[locus]:
                             same_pats[locus][query] = hits[query]
-        
+
         return same_pats
 
     def run_blastn_for_missed_clipped(self, query_fa, target_fa, word_size):
@@ -490,7 +491,7 @@ class TREFinder:
             return blastn_out
         else:
             sys.exit('cannot run {}'.format(cmd))
-   
+
     def align_patterns(self, queries, targets, locus=None, word_size=4, min_word_size=4):
         query_fa = ''
         min_len = None
@@ -498,7 +499,7 @@ class TREFinder:
             if min_len is None or len(seq) < min_len:
                 min_len = len(seq)
             query_fa += '>{}\n{}\n'.format(seq, seq)
-        
+
         target_fa = ''
         for seq in targets:
             if min_len is None or len(seq) < min_len:
@@ -528,7 +529,7 @@ class TREFinder:
                 return blastn_out
             else:
                 sys.exit('cannot run {}'.format(cmd))
-            
+
     def parse_pat_blastn(self, blastn_out, min_pid=0.8, min_alen=0.8):
         matches = defaultdict(set)
         with open(blastn_out, 'r') as ff:
@@ -593,7 +594,7 @@ class TREFinder:
                     check_seq_len = abs(len(repeat_seqs[seq]) - 2 * flank)
                     span = float(combined_coords[0][1] - combined_coords[0][0] + 1)
                     min_span = 0.2 if check_seq_len < 50 else 0.5
-        
+
                     if combined_coords[0][0] >= (bounds[0] + too_far_from_read_end) or combined_coords[0][1] <= (bounds[1] - too_far_from_read_end):
                         if self.debug:
                             print('too_far_from_read_end', locus, read, combined_coords[0][0], combined_coords[0][1], seq_len, too_far_from_read_end)
@@ -611,7 +612,7 @@ class TREFinder:
 
                     # pick pat/motif of longest repeat
                     longest_pat_len = pat_lens_sorted[0][1]
-                    pats = set([p[0] for p in pat_lens if p[1] == longest_pat_len]) 
+                    pats = set([p[0] for p in pat_lens if p[1] == longest_pat_len])
 
                     # match given coordinates, but coords have to make sense first
                     if self.strict and genome_start < genome_end and size > 50:
@@ -760,7 +761,7 @@ class TREFinder:
             return qstart, qend, tpos, seq
 
         return None
-            
+
     def get_probe(self, clipped_end, locus, genome_fasta):
         if clipped_end == 'start':
             pend = locus[1] - 1
@@ -939,7 +940,7 @@ class TREFinder:
                                 qstart, qend, tpos, seq = missed
                                 missed_clipped.append([tuple(locus), clipped_end, read, qstart, qend, tpos, seq])
                             continue
-   
+
                         # leave patterns out, some too long for trf header
                         header, fa_entry = self.create_trf_fasta(locus[:3], aln1.query_name, tstart, tend, qstart, seq, aln1.infer_read_length())
                         patterns[header] = locus[-1]
@@ -960,7 +961,7 @@ class TREFinder:
                     if missed:
                         qstart, qend, tpos, seq = missed
                         missed_clipped.append([tuple(locus), clipped_end, read, qstart, qend, tpos, seq])
-      
+
             for read in remove:
                 del clipped[read]
 
@@ -977,13 +978,13 @@ class TREFinder:
                         if self.debug:
                             print('problem getting seq1 {} {} {} {} {}'.format(aln.query_name, locus, tstart, tend, qstart))
                         continue
-                    
+
                     # leave patterns out, some too long for trf header
                     header, fa_entry = self.create_trf_fasta(locus[:3], aln.query_name, tstart, tend, qstart, seq, aln.infer_read_length())
-                    patterns[header] = locus[-1]
+                    patterns[header] = locus[3]
                     repeat_seqs[header] = seq
 
-                    if not '*' in locus[-1]:
+                    if not '*' in locus[3]:
                         trf_input += fa_entry
                     else:
                         generic.add(header)
@@ -997,13 +998,13 @@ class TREFinder:
                 if not(aln.reference_start + closeness_to_end) <= locus[1] and not (aln.reference_end - closeness_to_end >= locus[2]):
                     continue
                 header, fa_entry = self.create_trf_fasta(locus[:3], read, tstart, tend, qstart, seq, aln.infer_read_length())
-                patterns[header] = locus[-1]
+                patterns[header] = locus[-3]
                 repeat_seqs[header] = seq
 
-                if not '*' in locus[-1]:
+                if not '*' in locus[3]:
                     trf_input += fa_entry
                 else:
-                    generic.add(header) 
+                    generic.add(header)
 
 
         variants = []
@@ -1028,7 +1029,7 @@ class TREFinder:
                                                        reads_fasta))
 
         # set genotyping configuration (class variable)
-        Variant.set_genotype_config(min_reads=self.min_cluster_size, max_num_clusters=self.max_num_clusters)
+        Variant.set_genotype_config(min_reads=self.min_cluster_size, sex=self.sex)
 
         for variant in variants:
             # genotype
@@ -1107,7 +1108,7 @@ class TREFinder:
             tre_variants = self.get_alleles(loci)
 
         return tre_variants
-    
+
     def genotype(self, loci_bed):
         # extract loci (return fake insertions)
         loci = []
@@ -1116,11 +1117,13 @@ class TREFinder:
                 if line[0] == '#':
                     continue
                 cols = line.rstrip().split()
-                if len(cols) >= 4:
+                if len(cols) >= 5:
                     self.max_str_len = 10000
                     self.min_str_len = 2
                     #if len(cols[3]) <= self.max_str_len:
-                    loci.append((cols[0], int(cols[1]), int(cols[2]), cols[3]))
+                    loci.append((cols[0], int(cols[1]), int(cols[2]), cols[3], cols[4]))
+                else:
+                    print("Warning: not enough columns in input BED file")
 
         # use give loci coordinates for reporting
         self.update_loci = False
@@ -1128,7 +1131,7 @@ class TREFinder:
         self.strict = True
 
         return self.collect_alleles(loci)
-    
+
     def output_tsv(self, variants, out_file, cmd=None):
         with open(out_file, 'w') as out:
             if cmd is not None:
@@ -1144,6 +1147,7 @@ class TREFinder:
 
     def output_bed(self, variants, out_file):
         headers = Variant.bed_headers
+
         for i in range(self.max_num_clusters):
             for j in ('size', 'copy_number', 'support'):
                 headers.append('allele{}:{}'.format(i+1, j))
@@ -1176,6 +1180,105 @@ class TREFinder:
                         cols.extend(['-'] * 3)
 
                 out.write('{}\n'.format('\t'.join(map(str, cols))))
+
+
+    def output_vcf(self, variants, out_file, sample, loci_bed):
+
+        # Get repeat/gene names
+        loci = {}
+        with open(loci_bed, 'r') as ff:
+            for line in ff:
+                if line[0] == '#':
+                    continue
+                cols = line.rstrip().split()
+                if len(cols) >= 6:
+                    loci["{}:{}-{}".format(cols[0], cols[1], cols[2])] = (cols[4], cols[5])
+
+
+        VCF_headers = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"] + [sample]
+        headers = VCF_headers
+
+        with open(out_file, 'w') as out:
+            out.write('##fileformat=VCFv4.1\n')
+            out.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant">\n')
+            out.write('##INFO=<ID=REF,Number=1,Type=Integer,Description="Reference copy number">\n')
+            out.write('##INFO=<ID=REPID,Number=1,Type=String,Description="Repeat identifier as specified in the variant catalog">\n')
+            out.write('##INFO=<ID=VARID,Number=1,Type=String,Description="Variant identifier as specified in the variant catalog">\n')
+            out.write('##INFO=<ID=RL,Number=1,Type=Integer,Description="Reference length in bp">\n')
+            out.write('##INFO=<ID=RU,Number=1,Type=String,Description="Repeat unit in the reference orientation">\n')
+            out.write('##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">\n')
+            out.write('##INFO=<ID=VARID,Number=1,Type=String,Description="Variant identifier as specified in the variant catalog">\n')
+            out.write('##FILTER=<ID=LowDepth,Description="The overall locus depth is below 10x or number of reads spanning one or both breakends is below 5">\n')
+            out.write('##FILTER=<ID=PASS,Description="All filters passed">\n')
+            out.write('##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">\n')
+            out.write('##FORMAT=<ID=ADFL,Number=1,Type=String,Description="Number of flanking reads consistent with the allele">\n')
+            out.write('##FORMAT=<ID=ADIR,Number=1,Type=String,Description="Number of in-repeat reads consistent with the allele">\n')
+            out.write('##FORMAT=<ID=ADSP,Number=1,Type=String,Description="Number of spanning reads consistent with the allele">\n')
+            out.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
+            out.write('##FORMAT=<ID=LC,Number=1,Type=Float,Description="Locus coverage">\n')
+            out.write('##FORMAT=<ID=REPCI,Number=1,Type=String,Description="Confidence interval for REPCN">\n')
+            out.write('##FORMAT=<ID=REPCN,Number=1,Type=String,Description="Number of repeat units spanned by the allele">\n')
+            out.write('##FORMAT=<ID=SO,Number=1,Type=String,Description="Type of reads that support the allele; can be SPANNING, FLANKING, or INREPEAT meaning that the reads span, flank, or are fully contained in the repeat">\n')
+            out.write('##ALT=<ID=STR10,Description="Allele comprised of 10 repeat units">\n')
+            out.write('##ALT=<ID=STR2,Description="Allele comprised of 2 repeat units">\n')
+            out.write('#{}\n'.format('\t'.join(headers)))
+            for variant in sorted(variants, key=itemgetter(0, 1, 2)):
+                cols = variant[:3] + [variant[4]]
+                sizes = []
+                copy_numbers = []
+                supports = []
+
+                gt = Variant.get_genotype(variant)
+                for allele, support in gt:
+                    if type(allele) is str:
+                        continue
+                    supports.append(support)
+                    if self.genotype_in_size:
+                        sizes.append(allele)
+                        copy_numbers.append(round(allele / len(variant[4]) , 1))
+                    else:
+                        copy_numbers.append(allele)
+                        sizes.append(allele * len(variant[4]))
+
+                for size, copy_number, support in zip(sizes, copy_numbers, supports):
+                    cols.extend([size, copy_number, support])
+
+                if len(gt) < self.max_num_clusters:
+                    for i in range(self.max_num_clusters - len(gt)):
+                        cols.extend(['-'] * 3)
+
+                chrom = cols[0]
+                start_pos = cols[1]
+                end_pos = cols[2]
+
+                ref_repeat_length = int(end_pos) - int(start_pos)
+                repeat_unit = cols[3]
+                ref_allele = repeat_unit[0]
+                ref_repeat_count = int(ref_repeat_length / len(repeat_unit))
+                repeat_id, variant_id = loci["{}:{}-{}".format(chrom, start_pos, end_pos)]
+
+                allele1_repeat_count = round(cols[5])
+                allel1_ci_lower = allele1_repeat_count
+                allel1_ci_upper = allele1_repeat_count
+                allel1_support = cols[6]
+
+                homzygous =  len(gt) == 1
+
+                if homzygous:
+                    is_ref_allele = abs(allele1_repeat_count - ref_repeat_count) < 1
+                    if is_ref_allele:
+                        # No variant here
+                        pass
+                    else:
+                        out.write("{}\t{}\t.\t{}\t<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/1:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos, ref_allele, allele1_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele1_repeat_count, allel1_ci_lower, allel1_ci_upper, allel1_ci_lower, allel1_ci_upper, allel1_support / 2, allel1_support / 2))
+
+                else:
+                    allele2_repeat_count = round(cols[8])
+                    allel2_ci_lower = allele2_repeat_count
+                    allel2_ci_upper = allele2_repeat_count
+                    allel2_support = cols[9]
+
+                    out.write("{}\t{}\t.\t{}\t<STR{}>,<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/2:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos, ref_allele, allele1_repeat_count, allele2_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele2_repeat_count, allel1_ci_lower, allel1_ci_upper, allel2_ci_lower, allel2_ci_upper, allel1_support, allel2_support))
 
     def cleanup(self):
         if self.tmp_files:

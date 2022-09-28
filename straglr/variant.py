@@ -21,21 +21,27 @@ class Variant:
 
     bed_headers = ['chrom', 'start', 'end', 'repeat_unit']
 
+
     @classmethod
-    def set_genotype_config(cls, method=None, min_reads=None, max_num_clusters=3, eps=None):
-        genotype_config = {'min_reads': 4, 'max_num_clusters': max_num_clusters}
+    def set_genotype_config(cls, method=None, min_reads=None, max_num_clusters=3, eps=None, sex="female"):
+        genotype_config = {'min_reads': 4, 'max_num_clusters': max_num_clusters, 'sex': sex}
 
         # minimum number of reads per cluster
         if min_reads is not None:
             genotype_config['min_reads'] = min_reads
 
-        cls.clustering = Cluster(genotype_config['min_reads'], genotype_config['max_num_clusters'])
+        max_genotype_dict = {
+         'male': {'chrX': 1},
+         'female': {}
+        }
+        cls.clustering = Cluster(genotype_config['min_reads'], max_genotype_dict[genotype_config['sex']])
 
     @classmethod
     def genotype(cls, variant, report_in_size=False):
         # cluster - always use sizes
         sizes = sorted([a[4] for a in variant[3]])
-        clusters = cls.clustering.cluster(sizes)
+        repeat_unit_len = len(variant[4])
+        clusters = cls.clustering.cluster(sizes, repeat_unit_len * 2, variant[0])
 
         # genotype labels: mean of either copy numbers(default) or size
         for cluster in clusters:

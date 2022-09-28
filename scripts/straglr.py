@@ -19,6 +19,8 @@ def parse_args():
     parser.add_argument("--regions", type=str, help="bed file for scanning only specific regions")
     parser.add_argument("--nprocs", type=int, help="number of processes", default=1)
     parser.add_argument("--chroms", type=str, nargs="+", help="chromosomes")
+    parser.add_argument("--sample", type=str, help="Sample name")
+    parser.add_argument("--sex", type=str, help="Sex")
     parser.add_argument("--loci", type=str, help="bed file of loci for genotyping")
     parser.add_argument("--min_support", type=int, help="minimum number of supporting reads for detecting expansion. Default:2", default=2)
     parser.add_argument("--min_cluster_size", type=int, help="minimum number of supporting reads for allele clustering. Default:2", default=2)
@@ -52,6 +54,7 @@ def main():
 
     tre_finder = TREFinder(args.bam,
                            args.genome_fasta,
+                           sex=args.sex,
                            nprocs=args.nprocs,
                            reads_fasta=args.reads_fasta,
                            max_str_len=args.max_str_len,
@@ -89,6 +92,7 @@ def main():
 
     # output both bed and tsv
     tre_finder.output_bed(variants, '{}.bed'.format(args.out_prefix))
+    tre_finder.output_vcf(variants, '{}.vcf'.format(args.out_prefix), args.sample, args.loci)
     tre_finder.output_tsv(variants, '{}.tsv'.format(args.out_prefix), cmd=' '.join(sys.argv))
 
 if __name__ == '__main__':

@@ -1,8 +1,10 @@
 import os
 import sys
 from setuptools import setup, find_packages
-sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/src')
-from src import __version__
+#sys.path.append(os.path.dirname(os.path.abspath(__file__)) + '/stragler')
+
+from straglr import __version__
+
 setup(
     name='straglr',
     version=__version__,
@@ -18,7 +20,7 @@ setup(
         'Intended Audience :: Science/Research',
         'Topic :: Scientific/Engineering :: Bio-Informatics',
         ],
-    packages=find_packages(),
+    packages=['straglr'],
     install_requires = [
         'pysam>=0.14.0',
         'pybedtools>=0.9.0',
@@ -27,7 +29,9 @@ setup(
         'scikit-learn>=1.1',
         'scipy>=1.8.0',
         ],
-    scripts = ['straglr.py',
-               'straglr_compare.py',
-               ],
+    entry_points ={
+        'console_scripts': [
+            'straglr-genotype=straglr.straglr_genotype:main'
+        ]
+    }
 )

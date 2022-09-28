@@ -4,19 +4,22 @@ from sklearn.mixture import GaussianMixture
 from scipy import stats
 
 class Cluster:
-    def __init__(self, min_pts, max_num_clusters):
+    def __init__(self, min_pts, max_cluster_dict):
         self.min_pts = min_pts
-        self.max_num_clusters = max_num_clusters
-        
-    def cluster(self, data):
+        self.max_cluster_dict = max_cluster_dict
+
+    def cluster(self, data, threshold, chrom):
         try:
-            return self.gmm(data)
+            return self.gmm(data, threshold, chrom)
         except:
             return []
-        
-    def gmm(self, x):
+
+    def gmm(self, x, threshold, chrom):
+        max_num_clusters = self.max_cluster_dict.get(chrom, 2)
+        #print(chrom, max_num_clusters)
+        #print(x)
         X = np.array([[i] for i in x])
-        N = np.arange(1, self.max_num_clusters + 1)
+        N = np.arange(1, max_num_clusters + 1)
         models = [None for i in range(len(N))]
         AICs = []
         BICs = []
@@ -28,12 +31,12 @@ class Cluster:
         BIC = [m.bic(X) for m in models]
         M_best = models[np.argmin(AIC)]
         labels = M_best.predict(X)
-        
+
         nclusters = M_best.n_components
         clusters = [[] for i in range(M_best.n_components)]
         for label, i in zip(labels, X):
             clusters[label].append(i[0])
-            
+
         # sort clusters
         for cluster in clusters:
             cluster.sort()
@@ -42,11 +45,12 @@ class Cluster:
             m = np.mean(cluster)
             s = np.std(cluster)
 
-        merged_clusters = self.merge_gmm_clusters(clusters)
+        merged_clusters = self.merge_gmm_clusters(clusters, threshold)
+        #merged_clusters = clusters
 
         return [c for c in merged_clusters if len(c) >= self.min_pts]
 
-    def merge_gmm_clusters(self, clusters, threshold=50, rel_threshold=0.05):
+    def merge_gmm_clusters(self, clusters, threshold, rel_threshold=0.0000005):
         if len(clusters) <= 1:
             return clusters
 
