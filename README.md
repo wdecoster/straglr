@@ -11,7 +11,7 @@ The file `environment.yaml` can by used by conda to create an environment with a
 ```
 mamba env create --name straglr --file=environment.yaml
 conda activate straglr
-pip install git+https://github.com/bcgsc/straglr.git@v1.3.0#egg=straglr
+pip install git+https://github.com/philres/straglr.git#egg=straglr
 ```
 ## Quick start
 ```
