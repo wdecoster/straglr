@@ -1,6 +1,6 @@
 # Straglr - *S*hort-*t*andem *r*epe*a*t *g*enotyping using *l*ong *r*eads
 
-Straglr is a tool that can be used for genome-wide scans for tandem repeat(TR) expansions or targeted genotyping using long-read alignments.
+This is a modified version of the original Straglr tool which focuses on genotyping of clinical tandem repeat(TR) expansions from targeted or whole genome long-read alignments.
 
 ## Installation
 Straglr is implemented in Python 3.8 and has been tested in Linux environment.
@@ -9,16 +9,14 @@ Straglr depends on [Tandem Repeat Finder(TRF)](https://tandem.bu.edu/trf/trf.htm
 
 The file `environment.yaml` can by used by conda to create an environment with all dependencies installed:
 ```
-conda env create --name straglr --file=environment.yaml
-```
-Straglr can be added to the environment via `pip`,
-```
+mamba env create --name straglr --file=environment.yaml
+conda activate straglr
 pip install git+https://github.com/bcgsc/straglr.git@v1.3.0#egg=straglr
 ```
-(for example to install v1.3.0), or run directly from the cloned repository:
+## Quick start
 ```
 conda activate straglr
-./straglr.py
+straglr-genotype --loci repeat-annotation/hg38/clinical_repeats.bed --sample <sample name> --vcf <output vcf> --sex <male/female> input.bam reference.fasta
 ```
 
 ## Input
@@ -26,66 +24,41 @@ Long read alignments sorted by genomic coordindates in BAM format against the re
 
 ## Usage
 ```
-python straglr.py <mm2.bam> <reference_fasta> <output_prefix> [--loci loci.bed] [--exclude skip_regions.bed] [--chroms chr] [--regions regions.bed] [--min_support N] [--min_ins_size N] [--min_str_len N] [--max_str_len N] [--nprocs N] [--genotype_in_size] [--max_num_clusters N] [--min_cluster_size N] [--working_dir] [--tmpdir] [--debug]
+usage: straglr-genotype [-h] --vcf VCF [--tsv TSV] [--threads THREADS] --sample SAMPLE [--sex {male,female}] --loci LOCI [--min_support MIN_SUPPORT] [--min_cluster_size MIN_CLUSTER_SIZE] [--genotype_in_size] [--max_cov MAX_COV] [--trf_args Match Mismatch Delta PM PI Minscore MaxPeriod] [--working_dir WORKING_DIR]
+                        [--tmpdir TMPDIR] [--debug] [--version]
+                        bam genome_fasta
+
+positional arguments:
+  bam                   bam file
+  genome_fasta          genome_fasta
+
+options:
+  -h, --help            show this help message and exit
+  --vcf VCF, -v VCF     Path to output VCF file.
+  --tsv TSV             Output per read stats to TSV file.
+  --threads THREADS, -t THREADS
+                        Number of processes
+  --sample SAMPLE       Sample name to use in output VCF file
+  --sex {male,female}   Sex of sample
+  --loci LOCI           bed file of loci for genotyping
+  --min_support MIN_SUPPORT
+                        minimum number of supporting reads for detecting expansion. Default:2
+  --min_cluster_size MIN_CLUSTER_SIZE
+                        minimum number of supporting reads for allele clustering. Default:2
+  --genotype_in_size    report genotype in size instead of copy numbers
+  --max_cov MAX_COV     maximum allowed coverage for ins inspection. Default:1000
+  --trf_args Match Mismatch Delta PM PI Minscore MaxPeriod
+                        tandem repeat finder arguments. Default:2 5 5 80 10 10 500
+  --working_dir WORKING_DIR
+                        working directory. Default:current directory
+  --tmpdir TMPDIR       directory to use for generating tmp files instead of system TEMP
+  --debug               debug mode i.e. keep trf output
+  --version             show program's version number and exit	
 ```
-
-Some common parameters:
-
-`--loci`: a BED file containing loci to be genotyped. 4 column BED format: chromosome start end repeat
-
-`--exclude`: a BED file containing regions to be skipped in genome-scan (e.g. long segmental duplications or pericentromeric regions) 
-
-`--chroms`: space-separated list of specific chromosomes for genome-scan
-
-`--regions`: a BED file containing regions to be used only in genome-scan
-
-`--min_support`: minimum number of suppport reads for an expansion to be captured in genome-scan (Default:2)
-
-`--min_ins_size`: minimum increase in size (relative to the reference genome) for an expansion to be captured in genome-scan (Default:100)
-
-`--min_str_len`: minimum length of repeat-motif for an expansion to be captured in genome-scan (Default:2)
-
-`--max_str_len`: maximum length of repeat-motif for an expansion to be captured in genome-scan (Default:50)
-
-`--nprocs`: number of processes to use in Python's multiprocessing
-
-`--genotype_in_size`: report genotype (column 5 of TSV output) in terms of allele sizes instead of copy numbers
-
-`--max_num_clusters`: maximum number of clusters to be tried in Gausssian Mixture Model (GMM) clustering (Default:2)
-
-`--min_cluster_size`: minimum number of reads required to constitute a cluster (allele) in GMM clustering (Default:2)
-
-`--working_dir`: working directory (Default: current directory)
-
-`--tmpdir`: user-specified directory for holding temporary files
-
-#### Example application: genome scan to detect TRs longer than the reference genome by 100bp:
-The most common use of Straglr is for detecting TR expansions over the reference genome by a defined size threshold. This will save computations spent on genotyping the majority of TRs in the human genome with no substantial change in lengths. The identified expanded alleles can then be screened for pathogenicity by comparing against known TR polymorphisms. A sample Straglr run to detect expansions larger than the reference alleles by 100 bp on TR loci 2-100bp in motif length:
-```
-straglr.py sample.mm2.bam hg38.fa straglr_scan --min_str_len 2 --max_str_len 100 --min_ins_size 100 --genotype_in_size --exclude hg38.exclude.bed --min_support 2 --max_num_clusters 2 --nprocs 32
-```
-Highly repetitive genomic regions may be problematic for aligners and give rise to questionable genotyping results. They can be skipped over in Straglr's genome scan. To generate a bed file that contains all segmental duplications, centromeric and gap regions for exclusion from a Straglr run:
-```
-(cut -f1-3 hg38.segdups.bed;awk '$3-$2>=10000' hg38.simple_repeats.bed | cut -f1-3;cat hg38.centromeres.bed hg38_gaps.bed) | bedtools sort -i - | bedtools merge -i - -d 1000 > hg38.exclude.bed
-```
-
-#### Example application: genome-wide genotyping
-1. Download UCSC Simple Repeats track in output format `all fields from selected table` using the online `Table Browser` tool
-2. Convert downloaded table into bed format, skipping all homopolymers, with last field specifying motif sequence, e.g.:
-	```
-	grep -v '^#' simple_repeats.downloaded.tsv | awk -vOFS='\t' 'length($17)>1 {print $2,$3,$4,$17}' > simple_repeats.bed
-	```
-3. Split whole-genome `bed` file into batches with smaller numbers of loci (e.g. 10,000), e.g.:
-	```
-	split -l 10000 -d -a 4 --additional-suffix=.bed simple_repeats.bed batch
-	```
-4. Run Straglr on Minimap2 alignments for each batch of TR loci in parallel on, for example, computing cluster, e.g.:
-	```
-	straglr.py sample.mm2.bam hg38.fa batch0001 --genotype_in_size --min_support 2 --loci batch0001.bed --max_str_len 100 --max_num_clusters 2 --nprocs 32
-	```
 
 ## Output
-1. \<output_prefix>.tsv - detailed output one support read per line 
+1. VCF file
+2. TSV file - detailed output one support read per line 
 	* chrom - chromosome name
 	* start - start coordinate of locus
 	* end - end coordinate of locus
@@ -96,15 +69,6 @@ Highly repetitive genomic regions may be problematic for aligners and give rise 
 	* size - size of allele
 	* read_start - start position of repeat in support read
 	* allele - allele that support read is assigned to
-
-2. \<output_prefix>.bed - summarized genotypes one locus per line
-	* chrom - chromosome name
-	* start - start coordinate of locus
-	* end - end coordinate of locus
-	* repeat_unit - repeat motifi
-	* allele\<N>.size, where N={1,2,3...} depending on `--max_num_clusters` e.g. N={1,2} if `--max_num_clusters`==2 (default)
-	* allele\<N>.copy_number
-	* allele\<N>.support
 
 ## Contact
 [Readman Chiu](mailto:rchiu@bcgsc.ca)
