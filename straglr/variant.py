@@ -49,14 +49,14 @@ class Variant:
                 alleles = cluster
             else:
                 alleles = [allele[3] for allele in variant[3] if allele[4] in cluster]
-            variant[5].append(round(np.mean(alleles), 1))
+            variant[5].append((np.percentile(alleles, 10), round(np.median(alleles), 1), np.percentile(alleles, 90)))
 
         # assign genotype to each allele
         for allele in variant[3]:
             assigned = False
             for i in range(len(clusters)):
                 if allele[4] in clusters[i]:
-                    allele.append(variant[5][i])
+                    allele.append(variant[5][i][1])
                     assigned = True
                     break
 
@@ -66,6 +66,7 @@ class Variant:
 
     @classmethod
     def get_genotype(cls, variant):
+
         allele_counts = Counter([allele[-1] for allele in variant[3]])
         gt = []
         for allele in sorted([a for a in allele_counts.keys() if type(a) is not str], reverse=True) +\

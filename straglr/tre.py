@@ -1227,8 +1227,12 @@ class TREFinder:
                 sizes = []
                 copy_numbers = []
                 supports = []
-
+                ci = {}
+                for l, m, u in variant[5]:
+                    ci[m] = (l, u)
+                #print(variant[5])
                 gt = Variant.get_genotype(variant)
+
                 for allele, support in gt:
                     if type(allele) is str:
                         continue
@@ -1243,10 +1247,6 @@ class TREFinder:
                 for size, copy_number, support in zip(sizes, copy_numbers, supports):
                     cols.extend([size, copy_number, support])
 
-                if len(gt) < self.max_num_clusters:
-                    for i in range(self.max_num_clusters - len(gt)):
-                        cols.extend(['-'] * 3)
-
                 chrom = cols[0]
                 start_pos = cols[1]
                 end_pos = cols[2]
@@ -1258,8 +1258,7 @@ class TREFinder:
                 repeat_id, variant_id = loci["{}:{}-{}".format(chrom, start_pos, end_pos)]
 
                 allele1_repeat_count = round(cols[5])
-                allel1_ci_lower = allele1_repeat_count
-                allel1_ci_upper = allele1_repeat_count
+                allel1_ci_lower, allel1_ci_upper = ci[cols[5]]
                 allel1_support = cols[6]
 
                 homzygous =  len(gt) == 1
@@ -1270,15 +1269,14 @@ class TREFinder:
                         # No variant here
                         pass
                     else:
-                        out.write("{}\t{}\t.\t{}\t<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/1:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos, ref_allele, allele1_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele1_repeat_count, allel1_ci_lower, allel1_ci_upper, allel1_ci_lower, allel1_ci_upper, allel1_support / 2, allel1_support / 2))
+                        out.write("{}\t{}\t.\t{}\t<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/1:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos, ref_allele, allele1_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele1_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel1_ci_lower), round(allel1_ci_upper), allel1_support / 2, allel1_support / 2))
 
                 else:
                     allele2_repeat_count = round(cols[8])
-                    allel2_ci_lower = allele2_repeat_count
-                    allel2_ci_upper = allele2_repeat_count
+                    allel2_ci_lower, allel2_ci_upper = ci[cols[8]]
                     allel2_support = cols[9]
 
-                    out.write("{}\t{}\t.\t{}\t<STR{}>,<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/2:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos, ref_allele, allele1_repeat_count, allele2_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele2_repeat_count, allel1_ci_lower, allel1_ci_upper, allel2_ci_lower, allel2_ci_upper, allel1_support, allel2_support))
+                    out.write("{}\t{}\t.\t{}\t<STR{}>,<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/2:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos, ref_allele, allele1_repeat_count, allele2_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele2_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel2_ci_lower), round(allel2_ci_upper), allel1_support, allel2_support))
 
     def cleanup(self):
         if self.tmp_files:
