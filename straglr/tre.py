@@ -1207,7 +1207,6 @@ class TREFinder:
             out.write('##INFO=<ID=RL,Number=1,Type=Integer,Description="Reference length in bp">\n')
             out.write('##INFO=<ID=RU,Number=1,Type=String,Description="Repeat unit in the reference orientation">\n')
             out.write('##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">\n')
-            out.write('##INFO=<ID=VARID,Number=1,Type=String,Description="Variant identifier as specified in the variant catalog">\n')
             out.write('##FILTER=<ID=LowDepth,Description="The overall locus depth is below 10x or number of reads spanning one or both breakends is below 5">\n')
             out.write('##FILTER=<ID=PASS,Description="All filters passed">\n')
             out.write('##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">\n')
