@@ -1182,7 +1182,9 @@ class TREFinder:
                 out.write('{}\n'.format('\t'.join(map(str, cols))))
 
 
-    def output_vcf(self, variants, out_file, sample, loci_bed):
+    def output_vcf(self, variants, out_file, sample, loci_bed, genome_fasta):
+
+        pyRef = pysam.FastaFile(genome_fasta)
 
         # Get repeat/gene names
         loci = {}
@@ -1247,12 +1249,14 @@ class TREFinder:
                     cols.extend([size, copy_number, support])
 
                 chrom = cols[0]
-                start_pos = cols[1]
-                end_pos = cols[2]
+                start_pos = int(cols[1])
+                end_pos = int(cols[2])
 
-                ref_repeat_length = int(end_pos) - int(start_pos)
+                ref_repeat_length = end_pos - start_pos
                 repeat_unit = cols[3]
-                ref_allele = repeat_unit[0]
+                ref_seq = pyRef.fetch(reference=chrom, start=start_pos, end=end_pos)
+                #ref_allele = repeat_unit[0] # TODO fix to match character in the reference
+                ref_allele = ref_seq[0]
                 ref_repeat_count = int(ref_repeat_length / len(repeat_unit))
                 repeat_id, variant_id = loci["{}:{}-{}".format(chrom, start_pos, end_pos)]
 
@@ -1268,14 +1272,17 @@ class TREFinder:
                         # No variant here
                         pass
                     else:
-                        out.write("{}\t{}\t.\t{}\t<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/1:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos, ref_allele, allele1_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele1_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel1_ci_lower), round(allel1_ci_upper), allel1_support / 2, allel1_support / 2))
+                        out.write("{}\t{}\t.\t{}\t<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/1:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos + 1, ref_allele, allele1_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele1_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel1_ci_lower), round(allel1_ci_upper), allel1_support / 2, allel1_support / 2))
 
                 else:
                     allele2_repeat_count = round(cols[8])
                     allel2_ci_lower, allel2_ci_upper = ci[cols[8]]
                     allel2_support = cols[9]
 
-                    out.write("{}\t{}\t.\t{}\t<STR{}>,<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/2:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos, ref_allele, allele1_repeat_count, allele2_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele2_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel2_ci_lower), round(allel2_ci_upper), allel1_support, allel2_support))
+                    out.write("{}\t{}\t.\t{}\t<STR{}>,<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/2:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos + 1, ref_allele, allele1_repeat_count, allele2_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele2_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel2_ci_lower), round(allel2_ci_upper), allel1_support, allel2_support))
+
+        pyRef.close()
+
 
     def cleanup(self):
         if self.tmp_files:
