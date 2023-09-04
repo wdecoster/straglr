@@ -75,7 +75,7 @@ def main():
 
     # output both bed and tsv
     #tre_finder.output_bed(variants, '{}.bed'.format(args.out_prefix))
-    tre_finder.output_vcf(variants, args.vcf, args.sample, args.loci, args.genome_fasta)
+    tre_finder.output_vcf(variants, args.vcf, args.sample, args.loci, args.genome_fasta, args.bam)
     if args.tsv:
         tre_finder.output_tsv(variants, args.tsv, cmd=' '.join(sys.argv))
 

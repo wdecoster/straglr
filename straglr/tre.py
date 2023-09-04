@@ -1182,9 +1182,10 @@ class TREFinder:
                 out.write('{}\n'.format('\t'.join(map(str, cols))))
 
 
-    def output_vcf(self, variants, out_file, sample, loci_bed, genome_fasta):
+    def output_vcf(self, variants, out_file, sample, loci_bed, genome_fasta, bam):
 
         pyRef = pysam.FastaFile(genome_fasta)
+        pyBAM = pysam.AlignmentFile(bam,'rb')
 
         # Get repeat/gene names
         loci = {}
@@ -1266,22 +1267,30 @@ class TREFinder:
 
                 homzygous =  len(gt) == 1
 
+                d_sum = 0
+                d_n = 0
+                for pileupcolumn in pyBAM.pileup(chrom, start_pos, end_pos, truncate=True):
+                    d_sum += pileupcolumn.n
+                    d_n += 1
+                lc = int(d_sum / d_n)
+
                 if homzygous:
                     is_ref_allele = abs(allele1_repeat_count - ref_repeat_count) < 1
                     if is_ref_allele:
                         # No variant here
                         pass
                     else:
-                        out.write("{}\t{}\t.\t{}\t<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/1:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos + 1, ref_allele, allele1_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele1_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel1_ci_lower), round(allel1_ci_upper), allel1_support / 2, allel1_support / 2))
+                        out.write("{}\t{}\t.\t{}\t<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:REPCN:REPCI:ADSP:ADFL:ADIR:LC\t1/1:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0:{}\n".format(chrom, start_pos + 1, ref_allele, allele1_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele1_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel1_ci_lower), round(allel1_ci_upper), allel1_support / 2, allel1_support / 2, lc))
 
                 else:
                     allele2_repeat_count = round(cols[8])
                     allel2_ci_lower, allel2_ci_upper = ci[cols[8]]
                     allel2_support = cols[9]
 
-                    out.write("{}\t{}\t.\t{}\t<STR{}>,<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:CN:CI:AD_SP:AD_FL:AD_IR\t1/2:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0\n".format(chrom, start_pos + 1, ref_allele, allele1_repeat_count, allele2_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele2_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel2_ci_lower), round(allel2_ci_upper), allel1_support, allel2_support))
+                    out.write("{}\t{}\t.\t{}\t<STR{}>,<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:REPCN:REPCI:ADSP:ADFL:ADIR:LC\t1/2:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0:{}\n".format(chrom, start_pos + 1, ref_allele, allele1_repeat_count, allele2_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele2_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel2_ci_lower), round(allel2_ci_upper), allel1_support, allel2_support, lc))
 
         pyRef.close()
+        pyBAM.close()
 
 
     def cleanup(self):
