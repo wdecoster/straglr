@@ -14,6 +14,8 @@ import math
 import random
 from pybedtools import BedTool
 from datetime import datetime
+from .version import __version__
+
 
 class TREFinder:
     def __init__(self, bam, genome_fasta, sex="female", reads_fasta=None, check_split_alignments=True,
@@ -1201,96 +1203,109 @@ class TREFinder:
         VCF_headers = ["CHROM", "POS", "ID", "REF", "ALT", "QUAL", "FILTER", "INFO", "FORMAT"] + [sample]
         headers = VCF_headers
 
-        with open(out_file, 'w') as out:
-            out.write('##fileformat=VCFv4.1\n')
-            out.write('##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant">\n')
-            out.write('##INFO=<ID=REF,Number=1,Type=Integer,Description="Reference copy number">\n')
-            out.write('##INFO=<ID=REPID,Number=1,Type=String,Description="Repeat identifier as specified in the variant catalog">\n')
-            out.write('##INFO=<ID=VARID,Number=1,Type=String,Description="Variant identifier as specified in the variant catalog">\n')
-            out.write('##INFO=<ID=RL,Number=1,Type=Integer,Description="Reference length in bp">\n')
-            out.write('##INFO=<ID=RU,Number=1,Type=String,Description="Repeat unit in the reference orientation">\n')
-            out.write('##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">\n')
-            out.write('##FILTER=<ID=LowDepth,Description="The overall locus depth is below 10x or number of reads spanning one or both breakends is below 5">\n')
-            out.write('##FILTER=<ID=PASS,Description="All filters passed">\n')
-            out.write('##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">\n')
-            out.write('##FORMAT=<ID=ADFL,Number=1,Type=String,Description="Number of flanking reads consistent with the allele">\n')
-            out.write('##FORMAT=<ID=ADIR,Number=1,Type=String,Description="Number of in-repeat reads consistent with the allele">\n')
-            out.write('##FORMAT=<ID=ADSP,Number=1,Type=String,Description="Number of spanning reads consistent with the allele">\n')
-            out.write('##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n')
-            out.write('##FORMAT=<ID=LC,Number=1,Type=Float,Description="Locus coverage">\n')
-            out.write('##FORMAT=<ID=REPCI,Number=1,Type=String,Description="Confidence interval for REPCN">\n')
-            out.write('##FORMAT=<ID=REPCN,Number=1,Type=String,Description="Number of repeat units spanned by the allele">\n')
-            out.write('##FORMAT=<ID=SO,Number=1,Type=String,Description="Type of reads that support the allele; can be SPANNING, FLANKING, or INREPEAT meaning that the reads span, flank, or are fully contained in the repeat">\n')
-            out.write('##ALT=<ID=STR10,Description="Allele comprised of 10 repeat units">\n')
-            out.write('##ALT=<ID=STR2,Description="Allele comprised of 2 repeat units">\n')
-            out.write('#{}\n'.format('\t'.join(headers)))
-            for variant in sorted(variants, key=itemgetter(0, 1, 2)):
-                cols = variant[:3] + [variant[4]]
-                sizes = []
-                copy_numbers = []
-                supports = []
-                ci = {}
-                for l, m, u in variant[5]:
-                    ci[m] = (l, u)
-                #print(variant[5])
-                gt = Variant.get_genotype(variant)
+        output_vcf_header = ""
+        output_vcf_header_alt = set()
+        output_vcf_body = ""
 
-                for allele, support in gt:
-                    if type(allele) is str:
-                        continue
-                    supports.append(support)
-                    if self.genotype_in_size:
-                        sizes.append(allele)
-                        copy_numbers.append(round(allele / len(variant[4]) , 1))
-                    else:
-                        copy_numbers.append(allele)
-                        sizes.append(allele * len(variant[4]))
+        output_vcf_header += '##fileformat=VCFv4.1\n'
+        output_vcf_header += '##source=strglr_{}\n'.format(__version__)
+        for contig in sorted(zip(pyRef.references, pyRef.lengths), key=lambda x: x[0]):
+            output_vcf_header += "##contig=<ID={},length={}>\n".format(contig[0], contig[1])
 
-                for size, copy_number, support in zip(sizes, copy_numbers, supports):
-                    cols.extend([size, copy_number, support])
+        output_vcf_header += '##reference=file://{}'.format(genome_fasta)
+        output_vcf_header += '##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant">\n'
+        output_vcf_header +='##INFO=<ID=REF,Number=1,Type=Integer,Description="Reference copy number">\n'
+        output_vcf_header += '##INFO=<ID=REPID,Number=1,Type=String,Description="Repeat identifier as specified in the variant catalog">\n'
+        output_vcf_header += '##INFO=<ID=VARID,Number=1,Type=String,Description="Variant identifier as specified in the variant catalog">\n'
+        output_vcf_header += '##INFO=<ID=RL,Number=1,Type=Integer,Description="Reference length in bp">\n'
+        output_vcf_header += '##INFO=<ID=RU,Number=1,Type=String,Description="Repeat unit in the reference orientation">\n'
+        output_vcf_header += '##INFO=<ID=SVTYPE,Number=1,Type=String,Description="Type of structural variant">\n'
+        output_vcf_header += '##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the variant described in this record">\n'
+        output_vcf_header += '##FILTER=<ID=LowDepth,Description="The overall locus depth is below 10x or number of reads spanning one or both breakends is below 5">\n'
+        output_vcf_header += '##FILTER=<ID=PASS,Description="All filters passed">\n'
+        output_vcf_header += '##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">\n'
+        output_vcf_header += '##FORMAT=<ID=ADFL,Number=1,Type=String,Description="Number of flanking reads consistent with the allele">\n'
+        output_vcf_header += '##FORMAT=<ID=ADIR,Number=1,Type=String,Description="Number of in-repeat reads consistent with the allele">\n'
+        output_vcf_header += '##FORMAT=<ID=ADSP,Number=1,Type=String,Description="Number of spanning reads consistent with the allele">\n'
+        output_vcf_header += '##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">\n'
+        output_vcf_header += '##FORMAT=<ID=LC,Number=1,Type=Float,Description="Locus coverage">\n'
+        output_vcf_header += '##FORMAT=<ID=REPCI,Number=1,Type=String,Description="Confidence interval for REPCN">\n'
+        output_vcf_header += '##FORMAT=<ID=REPCN,Number=1,Type=String,Description="Number of repeat units spanned by the allele">\n'
+        output_vcf_header += '##FORMAT=<ID=SO,Number=1,Type=String,Description="Type of reads that support the allele; can be SPANNING, FLANKING, or INREPEAT meaning that the reads span, flank, or are fully contained in the repeat">\n'
 
-                chrom = cols[0]
-                start_pos = int(cols[1])
-                end_pos = int(cols[2])
+        for variant in sorted(variants, key=itemgetter(0, 1, 2)):
+            cols = variant[:3] + [variant[4]]
+            sizes = []
+            copy_numbers = []
+            supports = []
+            ci = {}
+            for l, m, u in variant[5]:
+                ci[m] = (l, u)
+            gt = Variant.get_genotype(variant)
 
-                ref_repeat_length = end_pos - start_pos
-                repeat_unit = cols[3]
-                ref_seq = pyRef.fetch(reference=chrom, start=start_pos, end=end_pos)
-                #ref_allele = repeat_unit[0] # TODO fix to match character in the reference
-                ref_allele = ref_seq[0]
-                ref_repeat_count = int(ref_repeat_length / len(repeat_unit))
-                repeat_id, variant_id = loci["{}:{}-{}".format(chrom, start_pos, end_pos)]
-
-                allele1_repeat_count = round(cols[5])
-                allel1_ci_lower, allel1_ci_upper = ci[cols[5]]
-                allel1_support = cols[6]
-
-                homzygous =  len(gt) == 1
-
-                d_sum = 0
-                d_n = 0
-                for pileupcolumn in pyBAM.pileup(chrom, start_pos, end_pos, truncate=True):
-                    d_sum += pileupcolumn.n
-                    d_n += 1
-                lc = int(d_sum / d_n)
-
-                if homzygous:
-                    is_ref_allele = abs(allele1_repeat_count - ref_repeat_count) < 1
-                    if is_ref_allele:
-                        # No variant here
-                        pass
-                    else:
-                        out.write("{}\t{}\t.\t{}\t<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:REPCN:REPCI:ADSP:ADFL:ADIR:LC\t1/1:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0:{}\n".format(chrom, start_pos + 1, ref_allele, allele1_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele1_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel1_ci_lower), round(allel1_ci_upper), allel1_support / 2, allel1_support / 2, lc))
-
+            for allele, support in gt:
+                if type(allele) is str:
+                    continue
+                supports.append(support)
+                if self.genotype_in_size:
+                    sizes.append(allele)
+                    copy_numbers.append(round(allele / len(variant[4]) , 1))
                 else:
-                    allele2_repeat_count = round(cols[8])
-                    allel2_ci_lower, allel2_ci_upper = ci[cols[8]]
-                    allel2_support = cols[9]
+                    copy_numbers.append(allele)
+                    sizes.append(allele * len(variant[4]))
 
-                    out.write("{}\t{}\t.\t{}\t<STR{}>,<STR{}>\t.\tPASS\tSVTYPE=STR;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:REPCN:REPCI:ADSP:ADFL:ADIR:LC\t1/2:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0:{}\n".format(chrom, start_pos + 1, ref_allele, allele1_repeat_count, allele2_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele2_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel2_ci_lower), round(allel2_ci_upper), allel1_support, allel2_support, lc))
+            for size, copy_number, support in zip(sizes, copy_numbers, supports):
+                cols.extend([size, copy_number, support])
+
+            chrom = cols[0]
+            start_pos = int(cols[1])
+            end_pos = int(cols[2])
+
+            ref_repeat_length = end_pos - start_pos
+            repeat_unit = cols[3]
+            ref_seq = pyRef.fetch(reference=chrom, start=start_pos, end=end_pos)
+            ref_allele = ref_seq[0]
+            ref_repeat_count = int(ref_repeat_length / len(repeat_unit))
+            repeat_id, variant_id = loci["{}:{}-{}".format(chrom, start_pos, end_pos)]
+
+            allele1_repeat_count = round(cols[5])
+            output_vcf_header_alt.add('##ALT=<ID=STR{},Description="Allele comprised of {} repeat units">\n'.format(allele1_repeat_count, allele1_repeat_count))
+            allel1_ci_lower, allel1_ci_upper = ci[cols[5]]
+            allel1_support = cols[6]
+
+            homzygous =  len(gt) == 1
+
+            d_sum = 0
+            d_n = 0
+            for pileupcolumn in pyBAM.pileup(chrom, start_pos, end_pos, truncate=True):
+                d_sum += pileupcolumn.n
+                d_n += 1
+            lc = int(d_sum / d_n)
+
+            if homzygous:
+                is_ref_allele = abs(allele1_repeat_count - ref_repeat_count) < 1
+                if is_ref_allele:
+                    # No variant here
+                    pass
+                else:
+                    output_vcf_body += "{}\t{}\t.\t{}\t<STR{}>\t.\tPASS\tSVTYPE=DUP;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:REPCN:REPCI:ADSP:ADFL:ADIR:LC\t1/1:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0:{}\n".format(chrom, start_pos + 1, ref_allele, allele1_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele1_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel1_ci_lower), round(allel1_ci_upper), allel1_support / 2, allel1_support / 2, lc)
+
+            else:
+                allele2_repeat_count = round(cols[8])
+                output_vcf_header_alt.add('##ALT=<ID=STR{},Description="Allele comprised of {} repeat units">\n'.format(allele2_repeat_count, allele2_repeat_count))
+                allel2_ci_lower, allel2_ci_upper = ci[cols[8]]
+                allel2_support = cols[9]
+
+                output_vcf_body += "{}\t{}\t.\t{}\t<STR{}>,<STR{}>\t.\tPASS\tSVTYPE=DUP;END={};REF={};RL={};RU={};REPID={};VARID={}\tGT:SO:REPCN:REPCI:ADSP:ADFL:ADIR:LC\t1/2:SPANNING/SPANNING:{}/{}:{}-{}/{}-{}:{}/{}:0/0:0/0:{}\n".format(chrom, start_pos + 1, ref_allele, allele1_repeat_count, allele2_repeat_count, end_pos,  ref_repeat_count, ref_repeat_length, repeat_unit, repeat_id, variant_id, allele1_repeat_count, allele2_repeat_count, round(allel1_ci_lower), round(allel1_ci_upper), round(allel2_ci_lower), round(allel2_ci_upper), allel1_support, allel2_support, lc)
 
         pyRef.close()
         pyBAM.close()
+
+        output_vcf_header += "".join(output_vcf_header_alt)
+        output_vcf_header += '#{}\n'.format('\t'.join(headers))
+        with open(out_file, 'w') as out:
+            out.write(output_vcf_header)
+            out.write(output_vcf_body)
 
 
     def cleanup(self):
