@@ -28,6 +28,7 @@ setup(
         'pathos>=0.2.3',
         'scikit-learn>=1.1',
         'scipy>=1.8.0',
+        'natsort'
         ],
     entry_points ={
         'console_scripts': [

@@ -10,6 +10,7 @@ from operator import itemgetter, attrgetter
 import itertools
 from .utils import split_tasks, parallel_process, combine_batch_results, create_tmp_file, reverse_complement, merge_spans, complement_spans
 from .ins import INSFinder, INS
+from natsort import natsorted
 import math
 import random
 from pybedtools import BedTool
@@ -1233,7 +1234,7 @@ class TREFinder:
         output_vcf_header += '##FORMAT=<ID=REPCN,Number=1,Type=String,Description="Number of repeat units spanned by the allele">\n'
         output_vcf_header += '##FORMAT=<ID=SO,Number=1,Type=String,Description="Type of reads that support the allele; can be SPANNING, FLANKING, or INREPEAT meaning that the reads span, flank, or are fully contained in the repeat">\n'
 
-        for variant in sorted(variants, key=itemgetter(0, 1, 2)):
+        for variant in natsorted(variants, key=itemgetter(0, 1, 2)):
             cols = variant[:3] + [variant[4]]
             sizes = []
             copy_numbers = []
