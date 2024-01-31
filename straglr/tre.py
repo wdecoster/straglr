@@ -176,6 +176,28 @@ class TREFinder:
 
         return same_pats
 
+    def iupac_match(self, seq1, seq2):
+        iupac_codes = {
+            'A': {'A'}, 'C': {'C'}, 'G': {'G'}, 'T': {'T'},
+            'R': {'A', 'G'}, 'Y': {'C', 'T'}, 'S': {'G', 'C'},
+            'W': {'A', 'T'}, 'K': {'G', 'T'}, 'M': {'A', 'C'},
+            'B': {'C', 'G', 'T'}, 'D': {'A', 'G', 'T'},
+            'H': {'A', 'C', 'T'}, 'V': {'A', 'C', 'G'}, 'N': {'A', 'C', 'G', 'T'}
+        }
+
+        if len(seq1) != len(seq2):
+            return False
+
+        match_count = 0
+
+        for base1, base2 in zip(seq1, seq2):
+            if base1 in iupac_codes and base2 in iupac_codes:
+                if iupac_codes[base1].intersection(iupac_codes[base2]):
+                    match_count += 1
+
+        return match_count == len(seq1)
+
+
     def is_same_repeat(self, reps, same_pats=None, min_fraction=0.5):
         def check_same_pats(rep1, rep2):
             if rep1 in same_pats:
@@ -196,8 +218,7 @@ class TREFinder:
             rep1, rep2 = reps[0], reps[1]
         else:
             rep2, rep1 = reps[0], reps[1]
-
-        if rep1 == rep2:
+        if self.iupac_match(rep1, rep2):
             return True
 
         perms1 = []
@@ -1186,7 +1207,6 @@ class TREFinder:
 
 
     def output_vcf(self, variants, out_file, sample, loci_bed, genome_fasta, bam):
-
         pyRef = pysam.FastaFile(genome_fasta)
         pyBAM = pysam.AlignmentFile(bam,'rb')
 
